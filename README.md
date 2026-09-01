@@ -11,7 +11,7 @@ LookSize 是一个原生 macOS 菜单栏工具。在 Finder 中按空格打开 Q
 
 ## 当前状态
 
-- 版本：0.1.5
+- 版本：0.1.6
 - 最低系统：macOS 13
 - 已构建验证：macOS 15.7.9、Intel x86_64
 - Apple Silicon：arm64 交叉编译通过，`dist/LookSize.app` 当前为 x86_64 + arm64 通用二进制
@@ -48,6 +48,43 @@ open dist/LookSize.app
 
 ```bash
 UNIVERSAL=1 ./scripts/build-app.sh
+```
+
+## 制作 macOS 安装包（免费方案）
+
+不加入付费 Apple Developer Program 也可以生成标准 DMG（Disk Image，磁盘映像）安装包：
+
+```bash
+./scripts/build-dmg.sh
+```
+
+脚本默认重新构建 Intel + Apple Silicon 通用 App，并生成：
+
+```text
+dist/LookSize-0.1.6-universal.dmg
+dist/LookSize-0.1.6-universal.dmg.sha256
+```
+
+安装步骤：
+
+1. 双击 DMG。
+2. 将 `LookSize.app` 拖到 `Applications`。
+3. 首次打开如果被 macOS 拦截，先尝试打开一次，再进入：
+   `系统设置 → 隐私与安全性 → 安全性 → 仍要打开`。
+4. 按提示授予辅助功能和 Finder 自动化权限。
+
+免费方案采用临时签名（Ad Hoc Signing），不具备 Developer ID 签名和 Apple 公证（Notarization）。因此从浏览器或网盘下载到其他 Mac 后，首次打开会出现安全提示；这是免费方案无法消除的系统限制。只应安装来自可信来源且 SHA-256 校验值一致的安装包，不要全局关闭 Gatekeeper。
+
+如只为当前 Mac 构建较小的单架构安装包：
+
+```bash
+UNIVERSAL=0 ./scripts/build-dmg.sh
+```
+
+如复用已有的 `dist/LookSize.app`：
+
+```bash
+REBUILD=0 ./scripts/build-dmg.sh
 ```
 
 首次启动后需要两项授权：
@@ -136,10 +173,21 @@ export LOOKSIZE_FFPROBE=/custom/path/ffprobe
 
 ## 测试
 
+只安装 Xcode Command Line Tools 时可执行安装包验证：
+
 ```bash
 cd LookSize
-swift test
 bash -n scripts/*.sh
+./scripts/build-dmg.sh
+hdiutil verify dist/LookSize-*.dmg
+(cd dist && shasum -a 256 -c LookSize-*.dmg.sha256)
+```
+
+单元测试使用 Swift Testing，需要完整 Xcode：
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+swift test
 ```
 
 手动验收：
@@ -169,6 +217,7 @@ bash -n scripts/*.sh
 - 多选文件后在 Quick Look 内切换时，优先根据 Quick Look 窗口标题匹配 Finder 选择；单选文件最稳定。
 - 没有 `ffprobe` 时，视频帧率来自 AVFoundation 的 `nominalFrameRate`，可变帧率文件只代表轨道标称值。
 - Apple Silicon 已通过 arm64 交叉编译，但尚未在 M 系列 Mac 上完成 Quick Look 实机交互验收。
+- 免费构建没有 Developer ID 和 Apple 公证，从网络下载后首次启动需要用户在“隐私与安全性”中手动确认；要消除此提示只能加入付费 Apple Developer Program 后进行 Developer ID 签名和公证。
 - 重建并重新签名 App 后，macOS 可能要求重新授予辅助功能和 Finder 自动化权限。建议固定安装到 `/Applications/LookSize.app`。
 
 ## 工程结构

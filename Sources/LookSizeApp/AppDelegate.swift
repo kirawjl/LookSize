@@ -175,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "LookSize 0.1.5"
+        alert.messageText = "LookSize 0.1.6"
         alert.informativeText = "在 Finder 的 Quick Look 文件名后显示图片分辨率，以及视频分辨率和帧率。\n\n这是视觉悬浮文字，不会修改 Finder、Quick Look 或原文件。"
         alert.addButton(withTitle: "确定")
         alert.runModal()
