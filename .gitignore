@@ -1,0 +1,39 @@
+# Swift Package Manager
+.build/
+.build-*/
+.swiftpm/
+
+# Generated applications and release artifacts
+dist/
+*.app
+*.dSYM
+*.xcarchive
+*.dmg
+*.pkg
+
+# Xcode and editor state
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.idea/
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Local configuration, credentials, and signing material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p8
+*.p12
+*.mobileprovision
+
+# Logs and temporary files
+*.log
+*.swp
+*~
