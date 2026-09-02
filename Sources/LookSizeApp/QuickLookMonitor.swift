@@ -17,6 +17,7 @@ final class QuickLookMonitor {
 
     private(set) var isEnabled = true
     private(set) var permissionGranted = AccessibilityPermission.isGranted
+    private(set) var automationPermissionStatus: FinderAutomationPermissionStatus?
     private(set) var currentFileName: String?
     private(set) var isQuickLookVisible = false
 
@@ -24,6 +25,10 @@ final class QuickLookMonitor {
     private let windowScanner = QuickLookWindowScanner()
     private let metadataReader = MediaMetadataReader()
     private let overlay = TitleOverlayController()
+    private let permissionQueue = DispatchQueue(
+        label: "com.wangke.LookSize.permissions",
+        qos: .userInitiated
+    )
     private let logger = Logger(subsystem: "com.wangke.LookSize", category: "monitor")
 
     private var timer: Timer?
@@ -37,6 +42,8 @@ final class QuickLookMonitor {
     private var selectionProbeInFlight = false
     private var lastSelectionProbe = Date.distantPast
     private var lastPermissionProbe = Date.distantPast
+    private var lastAutomationPermissionProbe = Date.distantPast
+    private var automationPermissionProbeInFlight = false
     private var lastSelectionSignature = ""
 
     func start() {
@@ -71,6 +78,21 @@ final class QuickLookMonitor {
         onStateChange?()
     }
 
+    func requestFinderAutomationPermission(
+        completion: ((FinderAutomationPermissionStatus) -> Void)? = nil
+    ) {
+        probeFinderAutomationPermission(prompt: true, completion: completion)
+    }
+
+    func refreshPermissions() {
+        let latestAccessibilityPermission = AccessibilityPermission.isGranted
+        if latestAccessibilityPermission != permissionGranted {
+            permissionGranted = latestAccessibilityPermission
+            onStateChange?()
+        }
+        probeFinderAutomationPermission(prompt: false)
+    }
+
     private func tick() {
         guard isEnabled else { return }
 
@@ -83,6 +105,10 @@ final class QuickLookMonitor {
                 logger.info("辅助功能权限状态：\(latestPermission ? "已授权" : "未授权", privacy: .public)")
                 onStateChange?()
             }
+        }
+
+        if now.timeIntervalSince(lastAutomationPermissionProbe) > 2 {
+            probeFinderAutomationPermission(prompt: false)
         }
 
         guard permissionGranted else {
@@ -143,6 +169,42 @@ final class QuickLookMonitor {
 
         if !wasVisible {
             onStateChange?()
+        }
+    }
+
+    private func probeFinderAutomationPermission(
+        prompt: Bool,
+        completion: ((FinderAutomationPermissionStatus) -> Void)? = nil
+    ) {
+        if automationPermissionProbeInFlight {
+            if prompt {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.probeFinderAutomationPermission(
+                        prompt: true,
+                        completion: completion
+                    )
+                }
+            }
+            return
+        }
+        automationPermissionProbeInFlight = true
+        lastAutomationPermissionProbe = Date()
+
+        permissionQueue.async { [weak self] in
+            let status = FinderAutomationPermission.status(prompt: prompt)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.automationPermissionProbeInFlight = false
+
+                if status != self.automationPermissionStatus {
+                    self.automationPermissionStatus = status
+                    self.logger.info(
+                        "Finder 自动化权限状态：\(String(describing: status), privacy: .public)"
+                    )
+                    self.onStateChange?()
+                }
+                completion?(status)
+            }
         }
     }
 

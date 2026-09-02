@@ -11,7 +11,7 @@ LookSize 是一个原生 macOS 菜单栏工具。在 Finder 中按空格打开 Q
 
 ## 当前状态
 
-- 版本：0.1.6
+- 版本：0.1.7
 - 最低系统：macOS 13
 - 已构建验证：macOS 15.7.9、Intel x86_64
 - Apple Silicon：arm64 交叉编译通过，`dist/LookSize.app` 当前为 x86_64 + arm64 通用二进制
@@ -32,6 +32,8 @@ LookSize 是一个原生 macOS 菜单栏工具。在 Finder 中按空格打开 Q
 - Quick Look 移动期间以 30 Hz 跟随，缩放后重新锚定系统文件名。
 - 仅在 Finder 位于前台时允许显示；关闭预览或切换应用后立即移除且不会被残留窗口重新触发。
 - 菜单栏可暂停监控、查看权限和当前文件。
+- 自动检测辅助功能与 Finder 自动化授权状态，并提供“授权诊断与修复”入口。
+- 读取桌面、文稿、下载、网络磁盘或移动磁盘时，显示对应的系统文件访问用途说明。
 
 ## 构建
 
@@ -61,8 +63,8 @@ UNIVERSAL=1 ./scripts/build-app.sh
 脚本默认重新构建 Intel + Apple Silicon 通用 App，并生成：
 
 ```text
-dist/LookSize-0.1.6-universal.dmg
-dist/LookSize-0.1.6-universal.dmg.sha256
+dist/LookSize-0.1.7-universal.dmg
+dist/LookSize-0.1.7-universal.dmg.sha256
 ```
 
 安装步骤：
@@ -87,16 +89,25 @@ UNIVERSAL=0 ./scripts/build-dmg.sh
 REBUILD=0 ./scripts/build-dmg.sh
 ```
 
-首次启动后需要两项授权：
+正常使用需要两项核心授权：
 
 ```text
 系统设置 → 隐私与安全性 → 辅助功能 → LookSize
 系统设置 → 隐私与安全性 → 自动化 → LookSize → Finder
 ```
 
+- **辅助功能（Accessibility）**：读取 Finder 与 Quick Look 的窗口、选中项和文件名位置，是显示悬浮信息的必要权限。
+- **Finder 自动化（Automation / Apple Events）**：在辅助功能接口暂时无法取得 Finder 选择时读取当前文件路径，是稳定识别预览文件所需的兜底权限。
+- **文件与文件夹（Files and Folders）**：只有媒体位于桌面、文稿、下载、网络磁盘或移动磁盘等受保护位置时，macOS 才会按需询问；不需要预先逐项授权。
+- **屏幕录制（Screen Recording）**：不需要。LookSize 不截取屏幕像素，只读取窗口元数据与辅助功能元素。
+
+菜单栏会自动刷新前两项权限状态。选择“授权诊断与修复…”可查看当前运行路径、请求缺失权限并打开对应系统设置。
+
 首次读取 Finder 选择时，系统会询问“LookSize 想控制 Finder”，请选择“允许”。LookSize 只读取当前选中文件路径，不执行改名、移动、删除或写入操作。
 
 授权后如果没有立即生效，退出并重新启动 LookSize。
+
+如果替换更新 App 后，系统设置中已有 LookSize，但菜单仍显示“未授权”，请先在对应权限列表中删除旧 LookSize，再重新打开 `/Applications/LookSize.app` 并授权。默认免费构建采用临时签名（Ad Hoc Signing），每次二进制变化都会产生新的代码身份，macOS 可能不会把旧授权自动继承给新版本。
 
 ## 安装到 Applications
 
@@ -127,7 +138,7 @@ REBUILD=1 UNIVERSAL=0 ./scripts/install.sh
 
 1. 启动 LookSize，菜单栏出现尺子图标。
 2. 确认菜单显示“辅助功能权限：已授权”。
-3. 允许 LookSize 自动化控制 Finder。
+3. 确认菜单显示“Finder 自动化权限：已授权”。
 4. 在 Finder 中单选图片或视频。
 5. 按空格打开 Quick Look。
 
@@ -171,6 +182,23 @@ export LOOKSIZE_FFPROBE=/custom/path/ffprobe
 
 注意：从 Finder 启动 App 时不会继承终端临时环境变量，正式使用建议安装到标准 Homebrew 路径。
 
+## 稳定签名与授权继承
+
+构建脚本默认使用临时签名：
+
+```bash
+./scripts/build-app.sh
+```
+
+临时签名的指定要求（Designated Requirement）通常绑定当前二进制哈希，替换更新后可能需要重新授权。若有固定的 Apple Development 或 Developer ID 证书，可让各版本使用同一签名身份：
+
+```bash
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+UNIVERSAL=1 ./scripts/build-app.sh
+```
+
+面向其他用户长期分发时，彻底稳定升级身份仍建议使用同一 Developer ID 签名并完成 Apple 公证；自动检测只能识别授权失效并引导修复，不能绕过 macOS 的用户确认或替用户授予权限。
+
 ## 测试
 
 只安装 Xcode Command Line Tools 时可执行安装包验证：
@@ -183,7 +211,13 @@ hdiutil verify dist/LookSize-*.dmg
 (cd dist && shasum -a 256 -c LookSize-*.dmg.sha256)
 ```
 
-单元测试使用 Swift Testing，需要完整 Xcode：
+运行 Swift Testing 单元测试：
+
+```bash
+swift test
+```
+
+如果本机 `xcode-select` 指向的旧版 Command Line Tools 不包含 Swift Testing，再切换到完整 Xcode：
 
 ```bash
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -192,12 +226,13 @@ swift test
 
 手动验收：
 
-1. 菜单栏显示“辅助功能权限：已授权”。
-2. Finder 单选 JPG/PNG/HEIC，按空格后只补充分辨率，不重复文件名。
-3. Finder 单选 MOV/MP4，按空格后只补充分辨率和帧率。
-4. 标题栏空间足够时，悬浮信息应紧跟系统文件名右侧且无背景、边框或阴影；空间不足时显示在预览内容左上角。
-5. 关闭 Quick Look 或切换到其他应用，悬浮信息应立即隐藏且不闪回。
-6. 如果标题没有出现，保持 Quick Look 打开并运行：
+1. 菜单栏显示“辅助功能权限：已授权”和“Finder 自动化权限：已授权”。
+2. 关闭任一权限后，菜单状态应在约 2 秒内自动更新，尺子图标变为橙色；“授权诊断与修复…”应显示对应状态和当前 App 路径。
+3. Finder 单选 JPG/PNG/HEIC，按空格后只补充分辨率，不重复文件名。
+4. Finder 单选 MOV/MP4，按空格后只补充分辨率和帧率。
+5. 标题栏空间足够时，悬浮信息应紧跟系统文件名右侧且无背景、边框或阴影；空间不足时显示在预览内容左上角。
+6. 关闭 Quick Look 或切换到其他应用，悬浮信息应立即隐藏且不闪回。
+7. 如果标题没有出现，保持 Quick Look 打开并运行：
 
 ```bash
 ./dist/bin/looksize-inspect --quicklook-window
@@ -218,7 +253,7 @@ swift test
 - 没有 `ffprobe` 时，视频帧率来自 AVFoundation 的 `nominalFrameRate`，可变帧率文件只代表轨道标称值。
 - Apple Silicon 已通过 arm64 交叉编译，但尚未在 M 系列 Mac 上完成 Quick Look 实机交互验收。
 - 免费构建没有 Developer ID 和 Apple 公证，从网络下载后首次启动需要用户在“隐私与安全性”中手动确认；要消除此提示只能加入付费 Apple Developer Program 后进行 Developer ID 签名和公证。
-- 重建并重新签名 App 后，macOS 可能要求重新授予辅助功能和 Finder 自动化权限。建议固定安装到 `/Applications/LookSize.app`。
+- 默认临时签名构建在二进制更新后，macOS 可能要求重新授予辅助功能和 Finder 自动化权限。建议固定安装到 `/Applications/LookSize.app`；正式分发使用固定 Developer ID 身份。
 
 ## 工程结构
 

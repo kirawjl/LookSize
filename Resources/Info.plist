@@ -8,6 +8,8 @@
     <string>LookSize</string>
     <key>CFBundleExecutable</key>
     <string>LookSize</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.wangke.LookSize</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -17,15 +19,25 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.6</string>
+    <string>0.1.7</string>
     <key>CFBundleVersion</key>
-    <string>7</string>
+    <string>8</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>LookSize 需要读取 Finder 当前选中的文件，以便在 Quick Look 标题中显示媒体尺寸信息。</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>LookSize 需要读取你在 Finder 中预览的媒体文件，以显示尺寸和帧率。</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>LookSize 需要读取你在 Finder 中预览的媒体文件，以显示尺寸和帧率。</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>LookSize 需要读取你在 Finder 中预览的媒体文件，以显示尺寸和帧率。</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>LookSize 需要读取你在 Finder 中预览的媒体文件，以显示尺寸和帧率。</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>LookSize 需要读取你在 Finder 中预览的媒体文件，以显示尺寸和帧率。</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>

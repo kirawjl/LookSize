@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var menu: NSMenu!
 
     private var permissionItem: NSMenuItem!
+    private var automationPermissionItem: NSMenuItem!
     private var monitorStateItem: NSMenuItem!
     private var currentFileItem: NSMenuItem!
     private var toggleItem: NSMenuItem!
@@ -52,6 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionItem.isEnabled = false
         menu.addItem(permissionItem)
 
+        automationPermissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        automationPermissionItem.isEnabled = false
+        menu.addItem(automationPermissionItem)
+
         monitorStateItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         monitorStateItem.isEnabled = false
         menu.addItem(monitorStateItem)
@@ -70,6 +75,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.target = self
         menu.addItem(toggleItem)
 
+        let checkPermissionsItem = NSMenuItem(
+            title: "授权诊断与修复…",
+            action: #selector(showPermissionAssistant),
+            keyEquivalent: ""
+        )
+        checkPermissionsItem.target = self
+        menu.addItem(checkPermissionsItem)
+
         let requestPermissionItem = NSMenuItem(
             title: "请求辅助功能权限",
             action: #selector(requestAccessibilityPermission),
@@ -77,6 +90,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         requestPermissionItem.target = self
         menu.addItem(requestPermissionItem)
+
+        let requestAutomationPermissionItem = NSMenuItem(
+            title: "请求 Finder 自动化权限",
+            action: #selector(requestFinderAutomationPermission),
+            keyEquivalent: ""
+        )
+        requestAutomationPermissionItem.target = self
+        menu.addItem(requestAutomationPermissionItem)
 
         let openSettingsItem = NSMenuItem(
             title: "打开辅助功能设置…",
@@ -119,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionItem.title = monitor.permissionGranted
             ? "辅助功能权限：已授权"
             : "辅助功能权限：未授权"
+        automationPermissionItem.title = automationPermissionTitle
 
         if !monitor.isEnabled {
             monitorStateItem.title = "监控状态：已暂停"
@@ -135,15 +157,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.title = monitor.isEnabled ? "暂停监控" : "恢复监控"
         toggleItem.state = monitor.isEnabled ? .on : .off
 
-        statusItem.button?.contentTintColor = monitor.permissionGranted ? nil : .systemOrange
-        statusItem.button?.toolTip = monitor.permissionGranted
+        let allPermissionsGranted = monitor.permissionGranted
+            && monitor.automationPermissionStatus?.isAuthorized == true
+        statusItem.button?.contentTintColor = allPermissionsGranted ? nil : .systemOrange
+        statusItem.button?.toolTip = allPermissionsGranted
             ? "LookSize 正在运行"
-            : "LookSize 需要辅助功能权限"
+            : "LookSize 需要完成授权"
     }
 
     @objc private func toggleMonitoring() {
         monitor.setEnabled(!monitor.isEnabled)
         refreshStatus()
+    }
+
+    private var automationPermissionTitle: String {
+        switch monitor.automationPermissionStatus {
+        case .authorized:
+            return "Finder 自动化权限：已授权"
+        case .denied:
+            return "Finder 自动化权限：未授权"
+        case .notDetermined:
+            return "Finder 自动化权限：未请求"
+        case .targetNotRunning:
+            return "Finder 自动化权限：Finder 未运行"
+        case .unavailable(let status):
+            return "Finder 自动化权限：检测失败（\(status)）"
+        case nil:
+            return "Finder 自动化权限：检测中"
+        }
     }
 
     @objc private func requestAccessibilityPermission() {
@@ -152,6 +193,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             openAccessibilitySettings()
         }
         refreshStatus()
+    }
+
+    @objc private func requestFinderAutomationPermission() {
+        NSApp.activate(ignoringOtherApps: true)
+        monitor.requestFinderAutomationPermission { [weak self] status in
+            self?.refreshStatus()
+            if status == .denied {
+                self?.openAutomationSettings()
+            }
+        }
+    }
+
+    @objc private func showPermissionAssistant() {
+        monitor.refreshPermissions()
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = "LookSize 授权诊断"
+        alert.informativeText = permissionDiagnosticText
+        alert.addButton(withTitle: "请求缺失授权")
+        alert.addButton(withTitle: "打开相关设置")
+        alert.addButton(withTitle: "关闭")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            requestMissingPermissions()
+        case .alertSecondButtonReturn:
+            if !monitor.permissionGranted {
+                openAccessibilitySettings()
+            } else {
+                openAutomationSettings()
+            }
+        default:
+            break
+        }
+    }
+
+    private var permissionDiagnosticText: String {
+        let accessibility = monitor.permissionGranted ? "已授权" : "未授权"
+        let automation = automationPermissionTitle
+            .replacingOccurrences(of: "Finder 自动化权限：", with: "")
+        let runningPath = Bundle.main.bundleURL.path
+
+        return """
+        正常显示 Quick Look 信息需要：
+        • 辅助功能：\(accessibility)
+        • Finder 自动化：\(automation)
+
+        文件夹访问会在读取桌面、文稿、下载、网络磁盘或移动磁盘中的媒体时由系统按需询问。LookSize 不需要屏幕录制权限。
+
+        当前程序：\(runningPath)
+
+        如果更新后系统设置中已有 LookSize，但这里仍显示未授权，请删除旧条目，再重新打开 /Applications/LookSize.app 并授权。免费版本使用临时签名，替换程序后 macOS 可能把新版本识别为不同程序。
+        """
+    }
+
+    private func requestMissingPermissions() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let requestAccessibility = { [weak self] in
+            guard let self, !AccessibilityPermission.isGranted else { return }
+            self.monitor.requestAccessibilityPermission()
+            self.openAccessibilitySettings()
+            self.refreshStatus()
+        }
+
+        if monitor.automationPermissionStatus?.isAuthorized == true {
+            requestAccessibility()
+            return
+        }
+
+        monitor.requestFinderAutomationPermission { [weak self] status in
+            self?.refreshStatus()
+            if status == .denied {
+                self?.openAutomationSettings()
+            } else {
+                requestAccessibility()
+            }
+        }
     }
 
     @objc private func openAccessibilitySettings() {
@@ -175,7 +295,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "LookSize 0.1.6"
+        let version = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? ""
+        alert.messageText = "LookSize \(version)"
         alert.informativeText = "在 Finder 的 Quick Look 文件名后显示图片分辨率，以及视频分辨率和帧率。\n\n这是视觉悬浮文字，不会修改 Finder、Quick Look 或原文件。"
         alert.addButton(withTitle: "确定")
         alert.runModal()

@@ -1,3 +1,4 @@
+import CoreServices
 import Testing
 @testable import LookSizeCore
 
@@ -24,6 +25,21 @@ import Testing
             == "IMG_0001.HEIC · 4032×3024"
     )
     #expect(MetadataFormatting.overlayText(metadata: metadata) == "4032×3024")
+}
+
+@Test func finderAutomationPermissionStatusMapping() {
+    #expect(FinderAutomationPermission.status(for: noErr) == .authorized)
+    #expect(
+        FinderAutomationPermission.status(for: OSStatus(errAEEventNotPermitted)) == .denied
+    )
+    #expect(
+        FinderAutomationPermission.status(for: OSStatus(errAEEventWouldRequireUserConsent))
+            == .notDetermined
+    )
+    #expect(
+        FinderAutomationPermission.status(for: OSStatus(procNotFound)) == .targetNotRunning
+    )
+    #expect(FinderAutomationPermission.status(for: -9999) == .unavailable(-9999))
 }
 
 @Test func videoTitle() {

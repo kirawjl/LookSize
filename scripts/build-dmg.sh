@@ -52,12 +52,15 @@ LookSize $VERSION 安装说明
 2. 在“应用程序”中打开 LookSize。
 3. 如果 macOS 阻止首次打开：
    系统设置 → 隐私与安全性 → 安全性 → 仍要打开。
-4. 按提示授予：
+4. 打开菜单栏尺子图标，选择“授权诊断与修复…”，按提示授予：
    - 辅助功能权限
    - 自动化 → Finder 权限
+5. 如果覆盖更新后菜单仍显示未授权，请在对应系统权限列表中删除旧 LookSize，
+   再重新打开 /Applications/LookSize.app 并授权。
 
 说明：此免费构建采用临时（Ad Hoc）签名，没有 Apple Developer ID 和公证。
-请仅安装来自可信来源且校验值一致的安装包；无需也不建议关闭 Gatekeeper。
+替换程序后 macOS 可能不会继承旧授权。请仅安装来自可信来源且校验值一致的安装包；
+无需也不建议关闭 Gatekeeper。
 EOF
 
 rm -f "$OUTPUT_DMG" "$CHECKSUM_FILE"

@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 CONFIGURATION="${CONFIGURATION:-release}"
 UNIVERSAL="${UNIVERSAL:-0}"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 APP_DIR="$ROOT_DIR/dist/LookSize.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -73,9 +74,10 @@ else
 fi
 
 install -m 644 "$ROOT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
+install -m 644 "$ROOT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 plutil -lint "$CONTENTS_DIR/Info.plist" >/dev/null
-codesign --force --deep --sign - "$APP_DIR" >/dev/null
+codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_DIR" >/dev/null
 codesign --verify --deep --strict "$APP_DIR"
 
 printf '\n构建完成：\n  App: %s\n  CLI: %s\n' "$APP_DIR" "$CLI_DIR/looksize-inspect"
